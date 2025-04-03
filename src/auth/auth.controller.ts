@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res, Request } from '@nestjs/common';
 import { Response } from 'express';
 import { GoogleAuthService } from './google-auth.service';
 
@@ -12,19 +12,21 @@ export class AuthController {
     res.redirect(authUrl);
   }
 
-  @Post('google/verify')
-  async verifyGoogleToken(@Body('token') token: string) {
+  @Get('google/callback')
+  async googleAuthCallback(@Query('code') code: string, @Res() res: Response) {
     try {
-      const user = await this.googleAuthService.verifyToken(token);
-      return {
+      console.log('googleAuthCallback', code);
+      const user = await this.googleAuthService.getUserFromCode(code);
+      // Here you can create a session or JWT token for the user
+      return res.json({
         success: true,
         user,
-      };
+      });
     } catch (error) {
-      return {
+      return res.status(400).json({
         success: false,
         message: error.message,
-      };
+      });
     }
   }
 } 

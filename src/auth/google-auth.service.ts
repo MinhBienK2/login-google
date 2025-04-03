@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { IUser } from './interfaces/user.interface';
 
+interface GoogleUserInfo {
+  email: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+}
+
 @Injectable()
 export class GoogleAuthService {
   private client: OAuth2Client;
@@ -10,41 +17,35 @@ export class GoogleAuthService {
     this.client = new OAuth2Client(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      'http://localhost:3000/auth/google/callback'
+      'http://localhost:3000/auth/google/callback',
     );
-  }
-
-  async verifyToken(token: string): Promise<IUser> {
-    try {
-      const ticket = await this.client.verifyIdToken({
-        idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-
-      const payload = ticket.getPayload();
-      
-      if (!payload) {
-        throw new Error('Invalid token payload');
-      }
-
-      return {
-        email: payload.email || '',
-        firstName: payload.given_name || '',
-        lastName: payload.family_name || '',
-        picture: payload.picture,
-      };
-    } catch (error) {
-      throw new Error('Invalid token');
-    }
   }
 
   getAuthUrl(): string {
     return this.client.generateAuthUrl({
-      access_type: 'offline',
+      // redirect_uri: 'http://localhost:3000/auth/google/callback',
       scope: [
         'https://www.googleapis.com/auth/userinfo.profile',
         'https://www.googleapis.com/auth/userinfo.email',
       ],
+      access_type: 'offline',
+      response_type: 'code',
+      prompt: 'consent',
     });
+  }
+
+  async getUserFromCode(code: string): Promise<IUser> {
+    try {
+      const { tokens } = await this.client.getToken(code);
+      this.client.setCredentials(tokens);
+
+      const response = await this.client.request({
+        url: 'https://www.googleapis.com/oauth2/v3/userinfo',
+      });
+
+      return response.data as IUser;
+    } catch (error) {
+      throw new Error('Failed to authenticate with Google');
+    }
   }
 } 
